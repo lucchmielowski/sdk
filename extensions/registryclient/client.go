@@ -59,10 +59,10 @@ func SetupGlobalRegistryClient(secretLister corev1listers.SecretLister, defaultN
 	once.Do(func() {
 		opts := []Option{WithSecretLister(secretLister, defaultNamespace)}
 		if imagePullSecrets != "" {
-			opts = append(opts, WithImagePullSecrets(strings.Split(imagePullSecrets, ",")...))
+			opts = append(opts, WithImagePullSecrets(buildSecretList(imagePullSecrets, ",")...))
 		}
 		if regCredHelpers != "" {
-			opts = append(opts, WithCredentialHelpers(strings.Split(regCredHelpers, ",")...))
+			opts = append(opts, WithCredentialHelpers(buildSecretList(regCredHelpers, ",")...))
 		}
 		if allowInsecure {
 			opts = append(opts, WithAllowInsecureRegistry(true))
@@ -150,7 +150,7 @@ func New(opts ...Option) Client {
 
 	// create an array of key chains
 	kcs := []authn.Keychain{}
-	if len(o.imagePullSecrets) > 0 {
+	if len(o.imagePullSecrets) > 0 && o.secretLister != nil {
 		kcs = append(kcs, regcreds.NewSecretsKeychain(o.secretLister, o.defaultNamespace, o.imagePullSecrets...))
 	}
 	if len(o.credentialHelpers) > 0 {
@@ -246,4 +246,16 @@ func (c *client) FetchImageDescriptor(ctx context.Context, imageRef string) (*gc
 
 func (c *client) Keychain() authn.Keychain {
 	return c.keychain
+}
+
+// buildSecretList splits a comma-separated list of secrets into a slice of strings, trimming whitespace and ignoring empty entries.
+func buildSecretList(in string, sep string) []string {
+	parts := strings.Split(in, sep)
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
